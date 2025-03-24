@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل حالات المترددين - عيادة دير الحسي</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- مكتبة jsPDF لتصدير PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- مكتبة SheetJS لتصدير Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- دعم PWA -->
+    <!-- ربط ملف manifest.json -->
+    <link rel="manifest" href="manifest.json">
+    <!-- دعم iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Clinic App">
+    <link rel="apple-touch-icon" href="icon.png">
+    <!-- تسجيل Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <!-- زر تبديل اللغة -->
+        <div class="language-switch">
+            <button id="langSwitch" onclick="toggleLanguage()">English</button>
+        </div>
+
+        <h1 class="lang" data-ar="تسجيل حالات المترددين على العيادة الطبية - دير الحسي" data-en="Patient Registration - Deir Al-Hasi Clinic">تسجيل حالات المترددين على العيادة الطبية - دير الحسي</h1>
+        
+        <!-- نموذج إدخال بيانات المريض -->
+        <div class="form-section">
+            <h2 class="lang" data-ar="إدخال بيانات المريض" data-en="Enter Patient Data">إدخال بيانات المريض</h2>
+            <form id="patientForm">
+                <label for="patientName" class="lang" data-ar="اسم المريض:" data-en="Patient Name:">اسم المريض:</label>
+                <div class="voice-input">
+                    <input type="text" id="patientName" required>
+                    <button type="button" id="voiceBtn" class="lang" data-ar="🎙️ إدخال صوتي" data-en="🎙️ Voice Input">🎙️ إدخال صوتي</button>
+                </div>
+
+                <label for="ageGroup" class="lang" data-ar="الفئة العمرية:" data-en="Age Group:">الفئة العمرية:</label>
+                <select id="ageGroup" required>
+                    <option value="under-5" class="lang" data-ar="أقل من 5 سنوات" data-en="Under 5 years">أقل من 5 سنوات</option>
+                    <option value="5-18" class="lang" data-ar="من 5 إلى 18 سنة" data-en="5 to 18 years">من 5 إلى 18 سنة</option>
+                    <option value="over-18" class="lang" data-ar="أكبر من 18 سنة" data-en="Over 18 years">أكبر من 18 سنة</option>
+                </select>
+
+                <label for="gender" class="lang" data-ar="الجنس:" data-en="Gender:">الجنس:</label>
+                <select id="gender" required>
+                    <option value="M" class="lang" data-ar="ذكر" data-en="Male">ذكر</option>
+                    <option value="F" class="lang" data-ar="أنثى" data-en="Female">أنثى</option>
+                </select>
+
+                <label for="diseaseType" class="lang" data-ar="نوع المرض:" data-en="Disease Type:">نوع المرض:</label>
+                <select id="diseaseType" required>
+                    <option value="" disabled selected class="lang" data-ar="اختر نوع المرض" data-en="Select Disease Type">اختر نوع المرض</option>
+                    <option value="communicable" class="lang" data-ar="معدي" data-en="Communicable">معدي</option>
+                    <option value="non-communicable" class="lang" data-ar="غير معدي" data-en="Non-Communicable">غير معدي</option>
+                </select>
+
+                <label for="disease" class="lang" data-ar="المرض:" data-en="Disease:">المرض:</label>
+                <select id="disease" required>
+                    <option value="" disabled selected class="lang" data-ar="اختر المرض" data-en="Select Disease">اختر المرض</option>
+                    <!-- الخيارات ستُملأ ديناميكيًا عبر JavaScript -->
+                </select>
+
+                <!-- حقل تفاصيل الحالات الأخرى -->
+                <div id="otherDetailsSection" style="display: none;">
+                    <label for="otherDetails" class="lang" data-ar="تفاصيل الحالة:" data-en="Case Details:">تفاصيل الحالة:</label>
+                    <input type="text" id="otherDetails" placeholder="أدخل تفاصيل الحالة">
+                </div>
+
+                <label for="referred" class="lang" data-ar="حالة الإحالة:" data-en="Referral Status:">حالة الإحالة:</label>
+                <select id="referred">
+                    <option value="no" class="lang" data-ar="لا" data-en="No">لا</option>
+                    <option value="yes" class="lang" data-ar="نعم" data-en="Yes">نعم</option>
+                </select>
+
+                <button type="submit" class="lang" data-ar="إضافة المريض" data-en="Add Patient">إضافة المريض</button>
+            </form>
+        </div>
+
+        <!-- تقرير لكل فئة عمرية -->
+        <div class="report-section">
+            <!-- أزرار التصدير -->
+            <div class="export-buttons">
+                <button onclick="exportToPDF()" class="lang" data-ar="تصدير إلى PDF" data-en="Export to PDF">تصدير إلى PDF</button>
+                <button onclick="exportToExcel()" class="lang" data-ar="تصدير إلى Excel" data-en="Export to Excel">تصدير إلى Excel</button>
+            </div>
+
+            <!-- تقرير أقل من 5 سنوات -->
+            <h2 class="lang" data-ar="تقرير الحالات (أقل من 5 سنوات)" data-en="Report (Under 5 years)">تقرير الحالات (أقل من 5 سنوات)</h2>
+            <table id="reportTable-under-5">
+                <thead>
+                    <tr>
+                        <th colspan="3" class="lang" data-ar="عدد المرضى في العيادة الخارجية (أقل من 5 سنوات)" data-en="Number of OPD Patients (Under 5 years)">عدد المرضى في العيادة الخارجية (أقل من 5 سنوات)</th>
+                    </tr>
+                    <tr>
+                        <th class="lang" data-ar="الحالة" data-en="Condition">الحالة</th>
+                        <th class="lang" data-ar="ذكر (M)" data-en="Male (M)">ذكر (M)</th>
+                        <th class="lang" data-ar="أنثى (F)" data-en="Female (F)">أنثى (F)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- الأمراض المعدية -->
+                    <tr><td colspan="3" class="category lang" data-ar="الأمراض المعدية" data-en="Communicable Diseases" data-label="الفئة">الأمراض المعدية</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="الالتهاب الرئوي" data-en="Pneumonia" data-label="الحالة">الالتهاب الرئوي</td>
+                        <td id="under-5-pneumonia-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-pneumonia-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الإسهال" data-en="Diarrhea" data-label="الحالة">الإسهال</td>
+                        <td id="under-5-diarrhea-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-diarrhea-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الدوسنتاريا" data-en="Dysentery" data-label="الحالة">الدوسنتاريا</td>
+                        <td id="under-5-dysentery-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-dysentery-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الملاريا" data-en="Malaria" data-label="الحالة">الملاريا</td>
+                        <td id="under-5-malaria-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-malaria-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="حمى الضنك" data-en="Dengue Fever" data-label="الحالة">حمى الضنك</td>
+                        <td id="under-5-dengue-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-dengue-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="التخلص من الديدان + فيتامين أ" data-en="Deworming + Vitamin A" data-label="الحالة">التخلص من الديدان + فيتامين أ</td>
+                        <td id="under-5-deworming-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-deworming-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض معدية أخرى" data-en="Other Communicable Diseases" data-label="الحالة">أمراض معدية أخرى</td>
+                        <td id="under-5-others-communicable-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-others-communicable-F" data-label="أنثى (F)">0</td>
+                    </tr>
+
+                    <!-- الأمراض غير المعدية -->
+                    <tr><td colspan="3" class="category lang" data-ar="الأمراض غير المعدية" data-en="Non-Communicable Diseases" data-label="الفئة">الأمراض غير المعدية</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="ارتفاع ضغط الدم (جديد)" data-en="Hypertension (New)" data-label="الحالة">ارتفاع ضغط الدم (جديد)</td>
+                        <td id="under-5-hypertension-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-hypertension-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="السكري (جديد)" data-en="Diabetes (New)" data-label="الحالة">السكري (جديد)</td>
+                        <td id="under-5-diabetes-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-diabetes-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الانسداد الرئوي المزمن" data-en="COPD" data-label="الحالة">الانسداد الرئوي المزمن</td>
+                        <td id="under-5-copd-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-copd-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض القلب (جديد)" data-en="Heart Disease (New)" data-label="الحالة">أمراض القلب (جديد)</td>
+                        <td id="under-5-heart-disease-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-heart-disease-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض غير معدية أخرى" data-en="Other Non-Communicable Diseases" data-label="الحالة">أمراض غير معدية أخرى</td>
+                        <td id="under-5-others-non-communicable-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-others-non-communicable-F" data-label="أنثى (F)">0</td>
+                    </tr>
+
+                    <!-- حالات الإحالة -->
+                    <tr><td colspan="3" class="category lang" data-ar="عدد الحالات المحالة" data-en="Number of Referred Cases" data-label="الفئة">عدد الحالات المحالة</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="المحالون" data-en="Referred" data-label="الحالة">المحالون</td>
+                        <td id="under-5-referred-M" data-label="ذكر (M)">0</td>
+                        <td id="under-5-referred-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- تقرير من 5 إلى 18 سنة -->
+            <h2 class="lang" data-ar="تقرير الحالات (من 5 إلى 18 سنة)" data-en="Report (5 to 18 years)">تقرير الحالات (من 5 إلى 18 سنة)</h2>
+            <table id="reportTable-5-18">
+                <thead>
+                    <tr>
+                        <th colspan="3" class="lang" data-ar="عدد المرضى في العيادة الخارجية (من 5 إلى 18 سنة)" data-en="Number of OPD Patients (5 to 18 years)">عدد المرضى في العيادة الخارجية (من 5 إلى 18 سنة)</th>
+                    </tr>
+                    <tr>
+                        <th class="lang" data-ar="الحالة" data-en="Condition">الحالة</th>
+                        <th class="lang" data-ar="ذكر (M)" data-en="Male (M)">ذكر (M)</th>
+                        <th class="lang" data-ar="أنثى (F)" data-en="Female (F)">أنثى (F)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- الأمراض المعدية -->
+                    <tr><td colspan="3" class="category lang" data-ar="الأمراض المعدية" data-en="Communicable Diseases" data-label="الفئة">الأمراض المعدية</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="الالتهاب الرئوي" data-en="Pneumonia" data-label="الحالة">الالتهاب الرئوي</td>
+                        <td id="5-18-pneumonia-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-pneumonia-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الإسهال" data-en="Diarrhea" data-label="الحالة">الإسهال</td>
+                        <td id="5-18-diarrhea-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-diarrhea-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الدوسنتاريا" data-en="Dysentery" data-label="الحالة">الدوسنتاريا</td>
+                        <td id="5-18-dysentery-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-dysentery-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الملاريا" data-en="Malaria" data-label="الحالة">الملاريا</td>
+                        <td id="5-18-malaria-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-malaria-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="حمى الضنك" data-en="Dengue Fever" data-label="الحالة">حمى الضنك</td>
+                        <td id="5-18-dengue-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-dengue-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="التخلص من الديدان + فيتامين أ" data-en="Deworming + Vitamin A" data-label="الحالة">التخلص من الديدان + فيتامين أ</td>
+                        <td id="5-18-deworming-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-deworming-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض معدية أخرى" data-en="Other Communicable Diseases" data-label="الحالة">أمراض معدية أخرى</td>
+                        <td id="5-18-others-communicable-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-others-communicable-F" data-label="أنثى (F)">0</td>
+                    </tr>
+
+                    <!-- الأمراض غير المعدية -->
+                    <tr><td colspan="3" class="category lang" data-ar="الأمراض غير المعدية" data-en="Non-Communicable Diseases" data-label="الفئة">الأمراض غير المعدية</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="ارتفاع ضغط الدم (جديد)" data-en="Hypertension (New)" data-label="الحالة">ارتفاع ضغط الدم (جديد)</td>
+                        <td id="5-18-hypertension-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-hypertension-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="السكري (جديد)" data-en="Diabetes (New)" data-label="الحالة">السكري (جديد)</td>
+                        <td id="5-18-diabetes-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-diabetes-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الانسداد الرئوي المزمن" data-en="COPD" data-label="الحالة">الانسداد الرئوي المزمن</td>
+                        <td id="5-18-copd-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-copd-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض القلب (جديد)" data-en="Heart Disease (New)" data-label="الحالة">أمراض القلب (جديد)</td>
+                        <td id="5-18-heart-disease-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-heart-disease-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض غير معدية أخرى" data-en="Other Non-Communicable Diseases" data-label="الحالة">أمراض غير معدية أخرى</td>
+                        <td id="5-18-others-non-communicable-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-others-non-communicable-F" data-label="أنثى (F)">0</td>
+                    </tr>
+
+                    <!-- حالات الإحالة -->
+                    <tr><td colspan="3" class="category lang" data-ar="عدد الحالات المحالة" data-en="Number of Referred Cases" data-label="الفئة">عدد الحالات المحالة</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="المحالون" data-en="Referred" data-label="الحالة">المحالون</td>
+                        <td id="5-18-referred-M" data-label="ذكر (M)">0</td>
+                        <td id="5-18-referred-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- تقرير أكبر من 18 سنة -->
+            <h2 class="lang" data-ar="تقرير الحالات (أكبر من 18 سنة)" data-en="Report (Over 18 years)">تقرير الحالات (أكبر من 18 سنة)</h2>
+            <table id="reportTable-over-18">
+                <thead>
+                    <tr>
+                        <th colspan="3" class="lang" data-ar="عدد المرضى في العيادة الخارجية (أكبر من 18 سنة)" data-en="Number of OPD Patients (Over 18 years)">عدد المرضى في العيادة الخارجية (أكبر من 18 سنة)</th>
+                    </tr>
+                    <tr>
+                        <th class="lang" data-ar="الحالة" data-en="Condition">الحالة</th>
+                        <th class="lang" data-ar="ذكر (M)" data-en="Male (M)">ذكر (M)</th>
+                        <th class="lang" data-ar="أنثى (F)" data-en="Female (F)">أنثى (F)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- الأمراض المعدية -->
+                    <tr><td colspan="3" class="category lang" data-ar="الأمراض المعدية" data-en="Communicable Diseases" data-label="الفئة">الأمراض المعدية</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="الالتهاب الرئوي" data-en="Pneumonia" data-label="الحالة">الالتهاب الرئوي</td>
+                        <td id="over-18-pneumonia-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-pneumonia-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الإسهال" data-en="Diarrhea" data-label="الحالة">الإسهال</td>
+                        <td id="over-18-diarrhea-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-diarrhea-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الدوسنتاريا" data-en="Dysentery" data-label="الحالة">الدوسنتاريا</td>
+                        <td id="over-18-dysentery-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-dysentery-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الملاريا" data-en="Malaria" data-label="الحالة">الملاريا</td>
+                        <td id="over-18-malaria-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-malaria-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="حمى الضنك" data-en="Dengue Fever" data-label="الحالة">حمى الضنك</td>
+                        <td id="over-18-dengue-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-dengue-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="التخلص من الديدان + فيتامين أ" data-en="Deworming + Vitamin A" data-label="الحالة">التخلص من الديدان + فيتامين أ</td>
+                        <td id="over-18-deworming-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-deworming-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض معدية أخرى" data-en="Other Communicable Diseases" data-label="الحالة">أمراض معدية أخرى</td>
+                        <td id="over-18-others-communicable-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-others-communicable-F" data-label="أنثى (F)">0</td>
+                    </tr>
+
+                    <!-- الأمراض غير المعدية -->
+                    <tr><td colspan="3" class="category lang" data-ar="الأمراض غير المعدية" data-en="Non-Communicable Diseases" data-label="الفئة">الأمراض غير المعدية</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="ارتفاع ضغط الدم (جديد)" data-en="Hypertension (New)" data-label="الحالة">ارتفاع ضغط الدم (جديد)</td>
+                        <td id="over-18-hypertension-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-hypertension-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="السكري (جديد)" data-en="Diabetes (New)" data-label="الحالة">السكري (جديد)</td>
+                        <td id="over-18-diabetes-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-diabetes-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="الانسداد الرئوي المزمن" data-en="COPD" data-label="الحالة">الانسداد الرئوي المزمن</td>
+                        <td id="over-18-copd-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-copd-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض القلب (جديد)" data-en="Heart Disease (New)" data-label="الحالة">أمراض القلب (جديد)</td>
+                        <td id="over-18-heart-disease-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-heart-disease-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                    <tr>
+                        <td class="lang" data-ar="أمراض غير معدية أخرى" data-en="Other Non-Communicable Diseases" data-label="الحالة">أمراض غير معدية أخرى</td>
+                        <td id="over-18-others-non-communicable-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-others-non-communicable-F" data-label="أنثى (F)">0</td>
+                    </tr>
+
+                    <!-- حالات الإحالة -->
+                    <tr><td colspan="3" class="category lang" data-ar="عدد الحالات المحالة" data-en="Number of Referred Cases" data-label="الفئة">عدد الحالات المحالة</td></tr>
+                    <tr>
+                        <td class="lang" data-ar="المحالون" data-en="Referred" data-label="الحالة">المحالون</td>
+                        <td id="over-18-referred-M" data-label="ذكر (M)">0</td>
+                        <td id="over-18-referred-F" data-label="أنثى (F)">0</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
